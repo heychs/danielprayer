@@ -1,0 +1,51 @@
+name: 사이트 빌드와 배포
+
+on:
+  push:
+    branches: [main, claude/dazzling-fermat-hnpp6r]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 다글로에서 새 회차 가져오기
+        run: node scripts/build.mjs
+
+      # 받아 온 내용을 저장소에 남겨 두어, 다글로 링크가 사라져도 사이트가 유지되게 합니다.
+      - name: 가져온 내용 저장
+        run: |
+          git add cache site/data site/thumbs
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Update fetched sermon data"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

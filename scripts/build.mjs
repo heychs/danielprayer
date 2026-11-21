@@ -158,7 +158,7 @@ async function addEntry(entry) {
   if (year.days[meta.day]) throw new Error(`${meta.year}년 ${meta.day}일차가 두 번 들어 있습니다.`);
   year.days[meta.day] = { speaker: meta.speaker || `${meta.day}일차`, date: meta.date, youtube: ytId, daglo: entry.daglo };
 
-  const day = { keywords: board.keywords, summary: board.summary, script: board.script };
+  const day = { summary: board.summary, script: board.script };
   await writeFile(join(SITE, 'data', `${key}.js`),
     `(window.DP_DAYS = window.DP_DAYS || {})[${JSON.stringify(key)}] = ${JSON.stringify(day).replace(/</g, '\\u003c')};\n`);
   console.log(`  ${meta.year}년 ${meta.day}일차 · ${year.days[meta.day].speaker} · 요약 ${board.summary ? '있음' : '없음'} · 스크립트 ${board.script.length}단락`);

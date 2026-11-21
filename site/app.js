@@ -184,7 +184,6 @@ function renderRead(y, n) {
   currentYt = it.youtube;
   $('r-yt').href = yt;
   $('r-daglo2').href = it.daglo;
-  $('r-chips').innerHTML = '';
   $('r-summary').innerHTML = '<p>불러오는 중입니다.</p>';
   $('r-script').innerHTML = '';
   showTab('summary');
@@ -199,8 +198,6 @@ function renderRead(y, n) {
   const want = hashOf(y, n);
   loadDay(keyOf(y, n)).then((day) => {
     if (location.hash !== want) return;
-    $('r-chips').innerHTML = day.keywords.map((k) => `<li>${esc(k)}</li>`).join('');
-    $('keywords').hidden = !day.keywords.length;
     $('r-summary').innerHTML = day.summary
       ? mdToHtml(day.summary, it.youtube)
       : '<p>요약이 아직 없습니다. 스크립트 탭에서 전체 내용을 볼 수 있습니다.</p>';

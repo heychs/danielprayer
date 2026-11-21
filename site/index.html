@@ -114,13 +114,11 @@ a.card:hover h3 { color: var(--blue-ink); }
 @media (max-width: 899px) {
   .cols { display: block; }
   .side { display: contents; }
-  .video, .video-note, .btns { margin-bottom: 12px; }
+  .video, .video-note { margin-bottom: 12px; }
   .pager { margin-bottom: 22px; }
   .video.playing { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 60px); z-index: 5; box-shadow: 0 8px 20px rgba(0, 0, 0, .28); }
 }
-.btns { display: flex; flex-wrap: wrap; gap: 8px; }
-.btn { flex: 1 1 140px; text-align: center; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; }
-.btn:hover { border-color: var(--blue); color: var(--blue-ink); }
+.video-note a { color: var(--blue-ink); }
 .board { background: var(--surface); border: 1px solid var(--line); min-width: 0; }
 .board-bar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .board-bar b { color: var(--ink); font-weight: 700; }
@@ -229,11 +227,7 @@ a.card:hover h3 { color: var(--blue-ink); }
           </button>
           <div id="r-player"></div>
         </div>
-        <p class="video-note" id="r-video-note" hidden>이 영상은 사이트 안에서 재생할 수 없습니다. 아래 버튼으로 유튜브에서 볼 수 있습니다.</p>
-        <div class="btns">
-          <a class="btn" id="r-yt" target="_blank" rel="noopener">유튜브에서 영상 보기</a>
-          <a class="btn" id="r-daglo" target="_blank" rel="noopener">다글로에서 열기</a>
-        </div>
+        <p class="video-note" id="r-video-note" hidden>이 영상은 사이트 안에서 재생할 수 없습니다. <a id="r-yt" target="_blank" rel="noopener">유튜브에서 보기</a></p>
         <nav class="pager" id="r-pager" aria-label="이전·다음 회차"></nav>
       </aside>
       <article class="board">

@@ -183,7 +183,7 @@ function renderRead(y, n) {
   resetPlayer();
   currentYt = it.youtube;
   $('r-yt').href = yt;
-  $('r-daglo').href = it.daglo; $('r-daglo2').href = it.daglo;
+  $('r-daglo2').href = it.daglo;
   $('r-chips').innerHTML = '';
   $('r-summary').innerHTML = '<p>불러오는 중입니다.</p>';
   $('r-script').innerHTML = '';

@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read # 비공개 저장소에서는 배포 단계가 업로드한 사이트 파일을 찾으려면 필요합니다
   contents: write
   pages: write
   id-token: write

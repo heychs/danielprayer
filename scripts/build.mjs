@@ -15,10 +15,23 @@ const UA = 'Mozilla/5.0 (compatible; sermon-notes-build)';
 const exists = (p) => access(p).then(() => true, () => false);
 const pad = (n) => String(n).padStart(2, '0');
 
-async function get(url, headers = {}) {
-  const res = await fetch(url, { headers: { 'user-agent': UA, ...headers } });
-  if (!res.ok) throw new Error(`${res.status} ${url}`);
-  return res;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 다글로가 잠깐 거절하는 경우가 있어 몇 번 다시 시도합니다.
+async function get(url, headers = {}, tries = 4) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    if (i) await wait(2000 * i);
+    try {
+      const res = await fetch(url, { headers: { 'user-agent': UA, ...headers } });
+      if (res.ok) return res;
+      last = new Error(`${res.status} ${url}`);
+      if (res.status === 404) break;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
 }
 
 function shareId(url) {
@@ -38,6 +51,7 @@ async function fetchBoard(id) {
   const m = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(html);
   if (!m) throw new Error(`다글로 페이지 형식이 바뀌었습니다 (${id})`);
   const props = JSON.parse(m[1]).props.pageProps;
+  if (!props.boardInfo?.name) throw new Error('보드 내용이 비어 있습니다. 공유가 켜져 있는지, 링크가 맞는지 확인해 주세요.');
 
   const script = [];
   for (const item of props.script?.items ?? []) {
@@ -116,14 +130,16 @@ await mkdir(join(SITE, 'thumbs'), { recursive: true });
 
 const index = { years: {} };
 let fetched = 0;
+const failed = [];
 
-for (const entry of entries) {
+async function addEntry(entry) {
   const id = shareId(entry.daglo);
   const cacheFile = join(CACHE, `${id}.json`);
   let board = (await exists(cacheFile)) ? JSON.parse(await readFile(cacheFile, 'utf8')) : null;
   // 요약이 아직 없던 회차는 다시 확인합니다.
   if (!board || REFRESH || !board.summary) {
     console.log(`가져오는 중: ${entry.daglo}`);
+    if (fetched) await wait(700); // 다글로에 연달아 요청하지 않도록 잠깐 쉽니다
     board = await fetchBoard(id);
     await writeFile(cacheFile, JSON.stringify(board, null, 1));
     fetched++;
@@ -148,6 +164,16 @@ for (const entry of entries) {
   console.log(`  ${meta.year}년 ${meta.day}일차 · ${year.days[meta.day].speaker} · 요약 ${board.summary ? '있음' : '없음'} · 스크립트 ${board.script.length}단락`);
 }
 
+// 한 회차가 실패해도 나머지는 계속 만들고, 실패한 링크는 끝에 모아서 알려 줍니다.
+for (const entry of entries) {
+  try {
+    await addEntry(entry);
+  } catch (e) {
+    failed.push({ url: entry.daglo, reason: e.message });
+    console.log(`  ! 건너뜀: ${entry.daglo}\n    ${e.message.replace(/\n/g, '\n    ')}`);
+  }
+}
+
 // 기도회 첫날: 날짜가 적힌 회차에서 거꾸로 계산합니다.
 for (const [y, year] of Object.entries(index.years)) {
   const known = Object.entries(year.days).find(([, d]) => d.date);
@@ -161,4 +187,12 @@ for (const [y, year] of Object.entries(index.years)) {
 }
 
 await writeFile(join(SITE, 'data', 'index.js'), `window.DP_INDEX = ${JSON.stringify(index, null, 1)};\n`);
-console.log(`완료: 전체 ${entries.length}회차, 이번에 새로 가져온 것 ${fetched}회차`);
+console.log(`완료: 전체 ${entries.length}회차 중 ${entries.length - failed.length}회차 반영, 이번에 새로 가져온 것 ${fetched}회차`);
+if (failed.length) {
+  console.log(`\n반영하지 못한 링크 ${failed.length}개:`);
+  for (const f of failed) {
+    console.log(`  ${f.url}\n    ${f.reason.replace(/\n/g, '\n    ')}`);
+    // GitHub Actions 실행 화면에 경고로 표시됩니다.
+    if (process.env.GITHUB_ACTIONS) console.log(`::warning title=반영하지 못한 링크::${f.url} — ${f.reason.split('\n')[0]}`);
+  }
+}

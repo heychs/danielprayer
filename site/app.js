@@ -18,8 +18,88 @@ const clock = (sec) => {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
   return h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
+// 시각 표시. 누르면 페이지 안의 플레이어가 그 지점으로 이동합니다. (href 는 새 탭으로 열 때를 위한 것)
 const tsLink = (yt, sec, label) =>
-  `<a class="ts" href="https://youtu.be/${yt}?t=${sec}" target="_blank" rel="noopener" title="유튜브에서 ${label}부터 보기">${label}</a>`;
+  `<a class="ts" href="https://youtu.be/${yt}?t=${sec}" data-t="${sec}" title="영상을 ${label}부터 재생">${label}</a>`;
+
+// ── 페이지 안 유튜브 플레이어 ──
+let currentYt = null;     // 지금 보고 있는 회차의 영상
+let player = null;        // 유튜브 플레이어 (API 방식)
+let playerReady = false;
+let plainFrame = null;    // API 를 못 불러왔을 때 쓰는 일반 iframe
+let pendingSeek = null;   // 플레이어가 준비되기 전에 누른 시각
+let apiPromise = null;
+
+function loadYtApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  if (!apiPromise) {
+    apiPromise = new Promise((resolve, reject) => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(); };
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      s.onerror = () => { apiPromise = null; reject(new Error('youtube api')); };
+      document.head.appendChild(s);
+    });
+  }
+  return apiPromise;
+}
+
+const embedUrl = (yt, sec) =>
+  `https://www.youtube.com/embed/${yt}?autoplay=1&playsinline=1&rel=0&start=${sec}`;
+
+function resetPlayer() {
+  if (player && player.destroy) { try { player.destroy(); } catch (e) { /* 이미 사라짐 */ } }
+  player = null; playerReady = false; plainFrame = null; pendingSeek = null;
+  $('r-player').replaceChildren();
+  $('r-poster').hidden = false;
+  $('r-video-note').hidden = true;
+  const box = $('r-video');
+  box.classList.remove('playing');
+  delete box.dataset.loading;
+}
+
+function playAt(sec) {
+  const box = $('r-video');
+  if (!currentYt) return;
+  if (player && playerReady) { player.seekTo(sec, true); player.playVideo(); return; }
+  if (plainFrame) { plainFrame.src = embedUrl(currentYt, sec); return; }
+  pendingSeek = sec;
+  if (box.dataset.loading) return; // 불러오는 중이면 마지막에 누른 시각으로 시작합니다
+  box.dataset.loading = '1';
+  box.classList.add('playing');
+  $('r-poster').hidden = true;
+  $('r-video-note').hidden = true;
+  const yt = currentYt;
+  const slot = document.createElement('div');
+  $('r-player').replaceChildren(slot);
+  loadYtApi().then(() => {
+    if (yt !== currentYt || !slot.isConnected) return;
+    player = new window.YT.Player(slot, {
+      videoId: yt, width: '100%', height: '100%',
+      playerVars: { autoplay: 1, playsinline: 1, rel: 0, start: pendingSeek || 0 },
+      events: {
+        onReady: () => {
+          playerReady = true;
+          if (pendingSeek) player.seekTo(pendingSeek, true);
+          player.playVideo();
+          pendingSeek = null;
+        },
+        // 영상 소유자가 외부 재생을 막아 둔 경우 등
+        onError: () => { resetPlayer(); $('r-video-note').hidden = false; },
+      },
+    });
+  }).catch(() => {
+    if (yt !== currentYt || !slot.isConnected) return;
+    plainFrame = document.createElement('iframe');
+    plainFrame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    plainFrame.allowFullscreen = true;
+    plainFrame.title = '말씀 영상';
+    plainFrame.src = embedUrl(yt, pendingSeek || 0);
+    slot.replaceWith(plainFrame);
+    pendingSeek = null;
+  });
+}
 
 function loadDay(key) {
   const store = (window.DP_DAYS = window.DP_DAYS || {});
@@ -100,7 +180,9 @@ function renderRead(y, n) {
   $('r-date').textContent = `${n}일차 말씀 · ${dateOf(y, n)}`;
   $('r-thumb').src = `thumbs/${it.youtube}.jpg`;
   $('r-thumb').alt = `${n}일차 영상 썸네일`;
-  $('r-video').href = yt; $('r-yt').href = yt;
+  resetPlayer();
+  currentYt = it.youtube;
+  $('r-yt').href = yt;
   $('r-daglo').href = it.daglo; $('r-daglo2').href = it.daglo;
   $('r-chips').innerHTML = '';
   $('r-summary').innerHTML = '<p>불러오는 중입니다.</p>';
@@ -133,7 +215,7 @@ function route() {
   const m = /^#y(\d{4})-d(\d{2})$/.exec(location.hash);
   const y = m && Number(m[1]), n = m && Number(m[2]);
   const ok = !!(m && INDEX.years[y] && INDEX.years[y].days[n]);
-  if (ok) { year = y; renderRead(y, n); }
+  if (ok) { year = y; renderRead(y, n); } else { resetPlayer(); currentYt = null; }
   renderList();
   $('view-read').hidden = !ok;
   $('view-list').hidden = ok;
@@ -154,6 +236,13 @@ $('year-tabs').addEventListener('click', (e) => {
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
   if (b) showTab(b.dataset.tab);
+});
+$('r-poster').addEventListener('click', () => playAt(0));
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a.ts');
+  if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return; // 새 탭으로 여는 동작은 그대로 둡니다
+  e.preventDefault();
+  playAt(Number(a.dataset.t));
 });
 window.addEventListener('hashchange', route);
 route();

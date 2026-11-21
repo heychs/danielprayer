@@ -128,7 +128,7 @@ function renderList() {
     const it = data.days[n];
     if (it) {
       html += `<li><a class="card" href="${hashOf(year, n)}">
-        <div class="thumb"><img src="thumbs/${esc(it.youtube)}.jpg" alt="" loading="lazy"><span class="day"><i>DAY</i> ${pad(n)}</span></div>
+        <div class="thumb"><img src="thumbs/${esc(it.youtube)}.jpg" alt="" loading="lazy"></div>
         <div class="meta"><h3>${esc(it.speaker)}</h3><p>${n}일차 · ${dateOf(year, n)}</p></div></a></li>`;
     } else {
       html += `<li><div class="card soon">

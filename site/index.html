@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>다니엘기도회 다시 보기</title>
+<title>다니엘기도회 말씀 요약</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap">
 <style>
@@ -42,7 +42,7 @@
 body { margin: 0; }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; letter-spacing: -0.01em; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; letter-spacing: -0.01em; word-break: keep-all; overflow-wrap: break-word; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--band); }
 a { color: inherit; }
 a:focus-visible, button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
@@ -64,6 +64,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--yellow); outlin
 .shield { width: 18px; height: 20px; flex: none; }
 .hero h1 { margin: 0; font-weight: 300; font-size: clamp(30px, 6vw, 52px); line-height: 1.2; letter-spacing: -0.04em; text-wrap: balance; }
 .hero h1 b { font-weight: 700; }
+.hero h1 > span, .hero h1 > b { display: inline-block; } /* 줄이 바뀔 때는 "2026 다니엘기도회" / "말씀 요약" 단위로만 나뉩니다 */
 .hero .when { font-family: var(--font-num); font-weight: 700; font-size: clamp(30px, 5vw, 44px); line-height: 1; letter-spacing: 0.01em; margin: 10px 0 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .hero .when small { font-family: var(--font-body); font-weight: 400; font-size: 14px; color: var(--band-muted); letter-spacing: -0.01em; }
 
@@ -82,8 +83,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--yellow); outlin
 .thumb { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--tile); overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
 a.card:hover .thumb img { transform: scale(1.04); }
-.day { position: absolute; left: 0; top: 0; background: var(--band); color: #fff; font-family: var(--font-num); font-weight: 700; font-size: 17px; line-height: 1; padding: 6px 9px 7px; letter-spacing: 0.02em; }
-.day i { font-style: normal; color: var(--yellow); }
 .card h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.4; letter-spacing: -0.02em; }
 a.card:hover h3 { color: var(--blue-ink); }
 .card p { margin: 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -181,9 +180,9 @@ a.card:hover h3 { color: var(--blue-ink); }
 <body>
 <div class="top">
   <div class="wrap">
-    <a class="brand" href="#" id="home-link" aria-label="다니엘기도회 다시 보기 처음으로">
+    <a class="brand" href="#" id="home-link" aria-label="다니엘기도회 말씀 요약 처음으로">
       <img src="logo.svg" alt="다니엘기도회">
-      <span>다시 보기</span>
+      <span>말씀 요약</span>
     </a>
     <a class="out" href="https://www.danielprayer.org/" target="_blank" rel="noopener">공식 홈페이지</a>
   </div>
@@ -196,8 +195,8 @@ a.card:hover h3 { color: var(--blue-ink); }
         <svg class="shield" viewBox="0 0 90 126" aria-hidden="true"><polygon fill="#005498" points="7,7 45,0 45,44 0,44"/><polygon fill="#78BDE0" points="45,0 83,7 90,44 45,44"/><polygon fill="#F26C24" points="0,44 45,44 45,102 7,82"/><polygon fill="#FBDD00" points="45,44 90,44 83,82 45,102"/></svg>
         21일간 열방과 함께하는
       </p>
-      <h1><b id="hero-year">2026</b> 다니엘기도회 <b>다시 보기</b></h1>
-      <p class="when"><span id="hero-when">11.1 – 21</span><small id="hero-sub">매일 저녁 선포된 말씀을 받아 적어 하루씩 모았습니다</small></p>
+      <h1><span><b id="hero-year">2026</b> 다니엘기도회</span> <b>말씀 요약</b></h1>
+      <p class="when"><span id="hero-when">11.1 – 21</span><small id="hero-sub">21일 동안 선포된 말씀을 하루씩 요약해 모았습니다</small></p>
     </div>
   </section>
 

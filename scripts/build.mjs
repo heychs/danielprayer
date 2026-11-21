@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// sermons.json 에 적힌 다글로 공유 링크를 읽어 사이트 데이터를 만듭니다.
+// sermons.txt 에 적힌 다글로 공유 링크를 읽어 사이트 데이터를 만듭니다.
 //   node scripts/build.mjs            새로 추가된 회차만 가져옵니다
 //   node scripts/build.mjs --refresh  모든 회차를 다시 가져옵니다
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -93,7 +93,23 @@ async function saveThumb(ytId) {
   console.warn(`  ! 썸네일을 받지 못했습니다 (${ytId})`);
 }
 
-const entries = JSON.parse(await readFile(join(ROOT, 'sermons.json'), 'utf8'));
+// sermons.txt 는 형식이 자유롭습니다. 다글로 공유 링크가 들어 있는 줄만 읽고 나머지는 무시합니다.
+// 같은 줄에 유튜브 링크가 함께 있으면 다글로에 저장된 주소 대신 그것을 씁니다.
+function readEntries(text) {
+  const seen = new Set();
+  const list = [];
+  for (const line of text.split('\n')) {
+    if (line.trim().startsWith('#')) continue;
+    const m = /https?:\/\/daglo\.ai\/share\/[A-Za-z0-9_-]+/.exec(line);
+    if (!m || seen.has(m[0])) continue;
+    seen.add(m[0]);
+    const yt = /https?:\/\/(?:www\.)?(?:youtu\.be|youtube\.com)\/\S+/.exec(line);
+    list.push({ daglo: m[0], ...(yt ? { youtube: yt[0] } : {}) });
+  }
+  return list;
+}
+
+const entries = readEntries(await readFile(join(ROOT, 'sermons.txt'), 'utf8'));
 await mkdir(CACHE, { recursive: true });
 await mkdir(join(SITE, 'data'), { recursive: true });
 await mkdir(join(SITE, 'thumbs'), { recursive: true });
@@ -116,9 +132,9 @@ for (const entry of entries) {
   const meta = { ...parseTitle(board.title), ...entry };
   const ytId = youtubeId(entry.youtube) ?? youtubeId(board.youtube);
   if (!meta.year || !meta.day) {
-    throw new Error(`제목에서 연도와 일차를 읽지 못했습니다: "${board.title}"\n  sermons.json 의 해당 항목에 "year", "day", "speaker" 를 직접 적어 주세요.`);
+    throw new Error(`제목에서 연도와 일차를 읽지 못했습니다: "${board.title}" (${entry.daglo})\n  다글로에서 보드 제목을 "[2026 다니엘기도회 1일차 말씀] 강사 이름 | 2026-11-01" 형식으로 고친 뒤 --refresh 로 다시 실행해 주세요.`);
   }
-  if (!ytId) throw new Error(`유튜브 주소를 찾지 못했습니다: ${entry.daglo}\n  sermons.json 의 해당 항목에 "youtube" 를 적어 주세요.`);
+  if (!ytId) throw new Error(`유튜브 주소를 찾지 못했습니다: ${entry.daglo}\n  sermons.txt 에서 이 링크와 같은 줄에 유튜브 링크를 적어 주세요.`);
   await saveThumb(ytId);
 
   const key = `${meta.year}-${pad(meta.day)}`;

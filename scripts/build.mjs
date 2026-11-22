@@ -2,7 +2,7 @@
 // sermons.txt 에 적힌 다글로 공유 링크를 읽어 사이트 데이터를 만듭니다.
 //   node scripts/build.mjs            새로 추가된 회차만 가져옵니다
 //   node scripts/build.mjs --refresh  모든 회차를 다시 가져옵니다
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, access, readdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +11,11 @@ const CACHE = join(ROOT, 'cache');
 const SITE = join(ROOT, 'site');
 const REFRESH = process.argv.includes('--refresh');
 const UA = 'Mozilla/5.0 (compatible; sermon-notes-build)';
+// 사이트가 올라가는 주소. 링크 미리보기(오픈그래프)는 전체 주소가 필요합니다.
+// 주소가 바뀌면 여기를 고치거나 SITE_URL 환경 변수로 넘겨 주세요.
+const SITE_URL = (process.env.SITE_URL || 'https://heychs.github.io/danielprayer').replace(/\/+$/, '') + '/';
+const SITE_NAME = '다니엘기도회 말씀 요약';
+const SITE_DESC = '다니엘기도회 21일 동안 선포된 말씀을 하루씩 요약해 모았습니다.';
 
 const exists = (p) => access(p).then(() => true, () => false);
 const pad = (n) => String(n).padStart(2, '0');
@@ -129,6 +134,7 @@ await mkdir(join(SITE, 'data'), { recursive: true });
 await mkdir(join(SITE, 'thumbs'), { recursive: true });
 
 const index = { years: {} };
+const pages = []; // 회차별 페이지를 만들 때 쓸 정보
 let fetched = 0;
 const failed = [];
 
@@ -159,6 +165,7 @@ async function addEntry(entry) {
   year.days[meta.day] = { speaker: meta.speaker || `${meta.day}일차`, date: meta.date, youtube: ytId, daglo: entry.daglo };
 
   const day = { summary: board.summary, script: board.script };
+  pages.push({ year: meta.year, day: meta.day, key, speaker: year.days[meta.day].speaker, youtube: ytId, summary: board.summary });
   await writeFile(join(SITE, 'data', `${key}.js`),
     `(window.DP_DAYS = window.DP_DAYS || {})[${JSON.stringify(key)}] = ${JSON.stringify(day).replace(/</g, '\\u003c')};\n`);
   console.log(`  ${meta.year}년 ${meta.day}일차 · ${year.days[meta.day].speaker} · 요약 ${board.summary ? '있음' : '없음'} · 스크립트 ${board.script.length}단락`);
@@ -187,6 +194,65 @@ for (const [y, year] of Object.entries(index.years)) {
 }
 
 await writeFile(join(SITE, 'data', 'index.js'), `window.DP_INDEX = ${JSON.stringify(index, null, 1)};\n`);
+
+// ── 페이지 만들기 ──
+// src/page.html 을 틀로 삼아 첫 화면(site/index.html)과 회차별 페이지(site/2026/01/index.html)를 만듭니다.
+// 회차별 페이지에는 그 회차의 제목·설명·썸네일이 미리보기 태그로 들어갑니다.
+const attr = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const template = await readFile(join(ROOT, 'src', 'page.html'), 'utf8');
+
+function renderPage({ base = '', title, description, path, image, imageW, imageH, type, dayScript = '' }) {
+  const head = [
+    base ? `<base href="${base}">` : '',
+    `<title>${attr(title)}</title>`,
+    `<meta name="description" content="${attr(description)}">`,
+    `<link rel="canonical" href="${attr(SITE_URL + path)}">`,
+    `<meta property="og:type" content="${type}">`,
+    `<meta property="og:site_name" content="${attr(SITE_NAME)}">`,
+    `<meta property="og:locale" content="ko_KR">`,
+    `<meta property="og:title" content="${attr(title)}">`,
+    `<meta property="og:description" content="${attr(description)}">`,
+    `<meta property="og:url" content="${attr(SITE_URL + path)}">`,
+    `<meta property="og:image" content="${attr(SITE_URL + image)}">`,
+    imageW ? `<meta property="og:image:width" content="${imageW}">` : '',
+    imageH ? `<meta property="og:image:height" content="${imageH}">` : '',
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${attr(title)}">`,
+    `<meta name="twitter:description" content="${attr(description)}">`,
+    `<meta name="twitter:image" content="${attr(SITE_URL + image)}">`,
+  ].filter(Boolean).join('\n');
+  return template
+    .replace('<!doctype html>', '<!doctype html>\n<!-- 빌드가 만드는 파일입니다. 고칠 때는 src/page.html 을 고쳐 주세요. -->')
+    .replace('<!--HEAD-->', head).replace('<!--DAY-->', dayScript);
+}
+
+// 요약 맨 위의 제목 한 줄을 미리보기 설명으로 씁니다.
+function headline(summary) {
+  const m = /^#\s+(.+)$/m.exec(summary || '');
+  return m ? m[1].trim() : null;
+}
+
+await writeFile(join(SITE, 'index.html'), renderPage({
+  title: SITE_NAME, description: SITE_DESC, path: '', type: 'website',
+  image: 'og.jpg', imageW: 1200, imageH: 630,
+}));
+
+// 목록에서 빠진 회차의 페이지가 남지 않도록 연도 폴더를 지우고 다시 만듭니다.
+for (const name of await readdir(SITE)) {
+  if (/^\d{4}$/.test(name)) await rm(join(SITE, name), { recursive: true });
+}
+for (const p of pages) {
+  const dir = join(SITE, String(p.year), pad(p.day));
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'index.html'), renderPage({
+    base: '../../',
+    title: `${p.speaker} · ${p.year} 다니엘기도회 ${p.day}일차`,
+    description: headline(p.summary) || `${p.year} 다니엘기도회 ${p.day}일차 말씀 요약`,
+    path: `${p.year}/${pad(p.day)}/`, type: 'article',
+    image: `thumbs/${p.youtube}.jpg`,
+    dayScript: `<script>window.DP_ROUTE = ${JSON.stringify({ year: p.year, day: p.day })};</script>\n<script src="data/${p.key}.js"></script>`,
+  }));
+}
 console.log(`완료: 전체 ${entries.length}회차 중 ${entries.length - failed.length}회차 반영, 이번에 새로 가져온 것 ${fetched}회차`);
 if (failed.length) {
   console.log(`\n반영하지 못한 링크 ${failed.length}개:`);

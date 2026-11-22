@@ -13,7 +13,8 @@ function dateOf(y, d) {
   return `${dt.getUTCFullYear()}.${pad(dt.getUTCMonth() + 1)}.${pad(dt.getUTCDate())} (${WEEK[dt.getUTCDay()]})`;
 }
 const keyOf = (y, d) => `${y}-${pad(d)}`;
-const hashOf = (y, d) => `#y${y}-d${pad(d)}`;
+// 회차마다 주소가 따로 있습니다 (예: 2026/01/). 링크를 공유했을 때 그 회차의 미리보기가 뜨게 하기 위해서입니다.
+const dayUrl = (y, d) => `${y}/${pad(d)}/`;
 const clock = (sec) => {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
   return h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
@@ -127,7 +128,7 @@ function renderList() {
   for (let n = 1; n <= 21; n++) {
     const it = data.days[n];
     if (it) {
-      html += `<li><a class="card" href="${hashOf(year, n)}">
+      html += `<li><a class="card" href="${dayUrl(year, n)}">
         <div class="thumb"><img src="thumbs/${esc(it.youtube)}.jpg" alt="" loading="lazy"></div>
         <div class="meta"><h3>${esc(it.speaker)}</h3><p>${n}일차 · ${dateOf(year, n)}</p></div></a></li>`;
     } else {
@@ -175,6 +176,7 @@ function renderRead(y, n) {
   const it = INDEX.years[y].days[n];
   const yt = `https://youtu.be/${it.youtube}`;
   $('back-label').textContent = `${y} 전체 회차`;
+  $('back-link').href = `./#y${y}`;
   $('r-eyebrow').textContent = `${y} 다니엘기도회 · DAY ${pad(n)}`;
   $('r-title').textContent = it.speaker;
   $('r-date').textContent = `${n}일차 말씀 · ${dateOf(y, n)}`;
@@ -192,12 +194,10 @@ function renderRead(y, n) {
   const i = nums.indexOf(n);
   const link = (k, cls, label) => k === undefined
     ? `<span class="${cls}"><small>${label}</small><b>없음</b></span>`
-    : `<a class="${cls}" href="${hashOf(y, k)}"><small>${label} · ${k}일차</small><b>${esc(INDEX.years[y].days[k].speaker)}</b></a>`;
+    : `<a class="${cls}" href="${dayUrl(y, k)}"><small>${label} · ${k}일차</small><b>${esc(INDEX.years[y].days[k].speaker)}</b></a>`;
   $('r-pager').innerHTML = link(nums[i - 1], 'prev', '← 이전') + link(nums[i + 1], 'next', '다음 →');
 
-  const want = hashOf(y, n);
   loadDay(keyOf(y, n)).then((day) => {
-    if (location.hash !== want) return;
     $('r-summary').innerHTML = day.summary
       ? mdToHtml(day.summary, it.youtube)
       : '<p>요약이 아직 없습니다. 스크립트 탭에서 전체 내용을 볼 수 있습니다.</p>';
@@ -208,27 +208,36 @@ function renderRead(y, n) {
   });
 }
 
-function route() {
-  const m = /^#y(\d{4})-d(\d{2})$/.exec(location.hash);
-  const y = m && Number(m[1]), n = m && Number(m[2]);
-  const ok = !!(m && INDEX.years[y] && INDEX.years[y].days[n]);
-  if (ok) { year = y; renderRead(y, n); } else { resetPlayer(); currentYt = null; }
+function redirectOldLink() {
+  const old = /^#y(\d{4})-d(\d{2})$/.exec(location.hash);
+  if (!old || window.DP_ROUTE) return false;
+  location.replace(dayUrl(old[1], Number(old[2])));
+  return true;
+}
+window.addEventListener('hashchange', redirectOldLink);
+
+// 회차 페이지는 빌드가 window.DP_ROUTE 로 어느 회차인지 알려 줍니다. 없으면 목록 화면입니다.
+function start() {
+  // 예전 주소(#y2026-d01)로 들어온 경우 새 주소로 보냅니다.
+  if (redirectOldLink()) return;
+
+  const r = window.DP_ROUTE;
+  const ok = !!(r && INDEX.years[r.year] && INDEX.years[r.year].days[r.day]);
+  if (ok) {
+    year = r.year;
+    renderRead(r.year, r.day);
+  } else {
+    const picked = /^#y(\d{4})$/.exec(location.hash);
+    if (picked && INDEX.years[picked[1]]) year = Number(picked[1]);
+  }
   renderList();
   $('view-read').hidden = !ok;
   $('view-list').hidden = ok;
-  window.scrollTo(0, 0);
 }
 
-function goHome(e) {
-  e.preventDefault();
-  location.hash = '';
-  route();
-}
-$('home-link').addEventListener('click', goHome);
-$('back-link').addEventListener('click', goHome);
 $('year-tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-year]');
-  if (b) { year = Number(b.dataset.year); renderList(); }
+  if (b) { year = Number(b.dataset.year); renderList(); history.replaceState(null, '', `#y${year}`); }
 });
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
@@ -241,5 +250,4 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   playAt(Number(a.dataset.t));
 });
-window.addEventListener('hashchange', route);
-route();
+start();
